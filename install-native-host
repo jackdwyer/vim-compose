@@ -3,6 +3,7 @@
 set -e
 
 repo=$(dirname $0)
+
 cd "$repo/native-host"
 
 if ! which pandoc > /dev/null; then
@@ -15,9 +16,19 @@ if ! which cargo > /dev/null; then
   exit 1
 fi
 
-if ! which gnome-terminal > /dev/null; then
-  echo "Error: \"gnome-terminal\" is not installed"
-  exit 1
+# Platform-specific terminal check
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  # macOS: check for Alacritty
+  if [ ! -f "/Applications/Alacritty.app/Contents/MacOS/alacritty" ]; then
+    echo "Error: \"Alacritty\" is not installed in /Applications"
+    exit 1
+  fi
+else
+  # Linux: check for gnome-terminal
+  if ! which gnome-terminal > /dev/null; then
+    echo "Error: \"gnome-terminal\" is not installed"
+    exit 1
+  fi
 fi
 
 if ! which vim > /dev/null; then
@@ -31,7 +42,11 @@ if ! cargo build --release; then
   exit 1
 fi
 
-bin_dir="$HOME/.local/bin"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  bin_dir="$HOME/.local/bin"
+else
+  bin_dir="$HOME/.local/bin"
+fi
 bin="$bin_dir/vim-compose-native-host"
 
 manifest_name="com.mbid.vim.compose.json"
@@ -40,12 +55,19 @@ escaped_bin="$(echo $bin | sed 's|/|\\/|g')"
 manifest_content_gecko="$(cat "$manifest_name.gecko" | sed s/PATH/$escaped_bin/)"
 manifest_content_chrome="$(cat "$manifest_name.chrome" | sed s/PATH/$escaped_bin/)"
 
-chromium_config="$HOME/.config/chromium"
-google_chrome_config="$HOME/.config/google-chrome"
-brave_config="$HOME/.config/BraveSoftware/Brave-Browser"
-firefox_config="$HOME/.mozilla"
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  chromium_config="$HOME/Library/Application Support/Chromium"
+  google_chrome_config="$HOME/Library/Application Support/Google/Chrome"
+  brave_config="$HOME/Library/Application Support/BraveSoftware/Brave-Browser"
+  firefox_config="$HOME/Library/Application Support/Mozilla"
+else
+  chromium_config="$HOME/.config/chromium"
+  google_chrome_config="$HOME/.config/google-chrome"
+  brave_config="$HOME/.config/BraveSoftware/Brave-Browser"
+  firefox_config="$HOME/.mozilla"
+fi
 
-if ! [ -d "$chromium_config" ] & ! [ -d "$google_chrome_config" ] & ! [ -d "$brave_config" ] & ! [ -d "$firefox_config" ]; then
+if ! [ -d "$chromium_config" ] && ! [ -d "$google_chrome_config" ] && ! [ -d "$brave_config" ] && ! [ -d "$firefox_config" ]; then
   echo "Error: Could not find google-chrome or chromium or brave profile" 2>&1
   echo "None of \"$chromium_config\", \"$google_chrome_config\" or \"$brave_config\" or \"$firefox_config\" exist" 2>&1
   exit 1
@@ -66,12 +88,12 @@ install_manifest() {
 if [ -d "$chromium_config" ]; then
 	install_manifest "$manifest_content_chrome" "$chromium_config/NativeMessagingHosts"
 fi
-if [ -d "$chrome_config" ]; then
+if [ -d "$google_chrome_config" ]; then
 	install_manifest "$manifest_content_chrome" "$google_chrome_config/NativeMessagingHosts"
 fi
 if [ -d "$brave_config" ]; then
 	install_manifest "$manifest_content_chrome" "$brave_config/NativeMessagingHosts"
 fi
 if [ -d "$firefox_config" ]; then
-	install_manifest "$manifest_content_gecko" "$firefox_config/native-messaging-hosts"
+	install_manifest "$manifest_content_gecko" "$firefox_config/NativeMessagingHosts"
 fi
